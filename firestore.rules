@@ -190,7 +190,10 @@ service cloud.firestore {
                     && get(produtoPath(request.resource.data.produtoId)).data.ativo == true
                     && get(produtoPath(request.resource.data.produtoId)).data.nome == request.resource.data.produtoNome
                     && get(produtoPath(request.resource.data.produtoId)).data.artesaoId == request.resource.data.artesaoId
-                    && get(produtoPath(request.resource.data.produtoId)).data.artesaoNome == request.resource.data.artesaoNome
+                    && (
+                      !get(produtoPath(request.resource.data.produtoId)).data.keys().hasAny(['artesaoNome'])
+                      || get(produtoPath(request.resource.data.produtoId)).data.artesaoNome == request.resource.data.artesaoNome
+                    )
                     && precoProdutoEmCentavos(get(produtoPath(request.resource.data.produtoId)).data) ==
                        request.resource.data.precoUnitarioCentavos
                     && getAfter(produtoPath(request.resource.data.produtoId)).data.quantidadeEstoque ==
