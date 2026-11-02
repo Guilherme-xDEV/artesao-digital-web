@@ -2,8 +2,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function logado() { return request.auth != null; }
-    function dono(uid) { return logado() && request.auth.uid == uid; }
+    function logado() {
+      return request.auth != null;
+    }
+
+    function dono(uid) {
+      return logado() && request.auth.uid == uid;
+    }
+
+    function produtoPath(produtoId) {
+      return /databases/$(database)/documents/produtos/$(produtoId);
+    }
 
     // Artesãos: cada um lê e edita apenas o próprio perfil; nunca apaga.
     match /artesaos/{uid} {
@@ -13,7 +22,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Produtos: leitura autenticada permite identificar itens durante uma venda.
+    // Produtos: leitura autenticada permite identificar itens durante a venda.
     // O ID do documento é o UUID codificado no QR Code.
     match /produtos/{id} {
       allow read: if logado();
@@ -21,34 +30,77 @@ service cloud.firestore {
       allow create: if dono(request.resource.data.artesaoId)
                     && request.resource.data.qrCodeId == id
                     && request.resource.data.ativo == true
+                    && request.resource.data.precoCentavos is int
                     && request.resource.data.precoCentavos > 0
+                    && request.resource.data.quantidadeEstoque is int
                     && request.resource.data.quantidadeEstoque >= 0;
 
-      // O proprietário pode editar os dados comerciais, mas não pode trocar
-      // o dono nem o identificador permanente do QR Code.
+      // O proprietário edita os dados do produto sem alterar sua identidade.
+      // Outro artesão só baixa o estoque quando cria a venda correspondente
+      // na mesma transação do Firestore.
       allow update: if logado()
                     && request.resource.data.artesaoId == resource.data.artesaoId
                     && request.resource.data.qrCodeId == resource.data.qrCodeId
                     && request.resource.data.precoCentavos > 0
+                    && request.resource.data.quantidadeEstoque is int
                     && request.resource.data.quantidadeEstoque >= 0
                     && (
-                      dono(resource.data.artesaoId)
-                      || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantidadeEstoque'])
+                      (
+                        dono(resource.data.artesaoId)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['nome', 'descricao', 'precoCentavos',
+                                     'quantidadeEstoque', 'ativo',
+                                     'atualizadoEm', 'ultimaVendaId'])
+                      )
+                      ||
+                      (
+                        !dono(resource.data.artesaoId)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['quantidadeEstoque', 'atualizadoEm', 'ultimaVendaId'])
+                        && request.resource.data.quantidadeEstoque < resource.data.quantidadeEstoque
+                        && request.resource.data.ultimaVendaId is string
+                        && existsAfter(/databases/$(database)/documents/vendas/$(request.resource.data.ultimaVendaId))
+                        && getAfter(/databases/$(database)/documents/vendas/$(request.resource.data.ultimaVendaId)).data.produtoId == id
+                        && getAfter(/databases/$(database)/documents/vendas/$(request.resource.data.ultimaVendaId)).data.vendedorId == request.auth.uid
+                        && getAfter(/databases/$(database)/documents/vendas/$(request.resource.data.ultimaVendaId)).data.quantidade ==
+                           resource.data.quantidadeEstoque - request.resource.data.quantidadeEstoque
+                      )
                     );
 
-      // A exclusão é lógica (ativo = false), preservando o histórico.
       allow delete: if false;
     }
 
-    // Vendas: somente criação (irretratabilidade). Lê quem vendeu ou o dono do produto.
+    // Vendas: somente criação; edição e exclusão são proibidas (irretratabilidade).
+    // O snapshot deve corresponder ao produto e à baixa de estoque na mesma transação.
     match /vendas/{id} {
       allow read: if logado()
                   && (resource.data.vendedorId == request.auth.uid
                       || resource.data.artesaoId == request.auth.uid);
-      allow create: if dono(request.resource.data.vendedorId)
+
+      allow create: if logado()
+                    && request.resource.data.keys().hasOnly([
+                      'produtoId', 'produtoNome', 'artesaoId', 'artesaoNome',
+                      'vendedorId', 'vendedorNome', 'precoUnitarioCentavos',
+                      'quantidade', 'totalCentavos', 'dataHora'
+                    ])
+                    && request.resource.data.vendedorId == request.auth.uid
+                    && request.resource.data.quantidade is int
                     && request.resource.data.quantidade >= 1
+                    && request.resource.data.precoUnitarioCentavos is int
+                    && request.resource.data.precoUnitarioCentavos > 0
                     && request.resource.data.totalCentavos ==
-                       request.resource.data.precoUnitarioCentavos * request.resource.data.quantidade;
+                       request.resource.data.precoUnitarioCentavos * request.resource.data.quantidade
+                    && request.resource.data.dataHora == request.time
+                    && exists(produtoPath(request.resource.data.produtoId))
+                    && get(produtoPath(request.resource.data.produtoId)).data.ativo == true
+                    && get(produtoPath(request.resource.data.produtoId)).data.nome == request.resource.data.produtoNome
+                    && get(produtoPath(request.resource.data.produtoId)).data.artesaoId == request.resource.data.artesaoId
+                    && get(produtoPath(request.resource.data.produtoId)).data.artesaoNome == request.resource.data.artesaoNome
+                    && get(produtoPath(request.resource.data.produtoId)).data.precoCentavos == request.resource.data.precoUnitarioCentavos
+                    && getAfter(produtoPath(request.resource.data.produtoId)).data.quantidadeEstoque ==
+                       get(produtoPath(request.resource.data.produtoId)).data.quantidadeEstoque - request.resource.data.quantidade
+                    && getAfter(produtoPath(request.resource.data.produtoId)).data.ultimaVendaId == id;
+
       allow update, delete: if false;
     }
   }

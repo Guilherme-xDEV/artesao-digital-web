@@ -36,6 +36,16 @@ export async function listarProdutosDoArtesao(artesaoId: string): Promise<Produt
     .sort((a, b) => (b.criadoEm?.toMillis() ?? 0) - (a.criadoEm?.toMillis() ?? 0))
 }
 
+/** Lista produtos ativos disponíveis para identificação e venda no centro. */
+export async function listarProdutosAtivos(): Promise<Produto[]> {
+  const consulta = query(collection(db, 'produtos'), where('ativo', '==', true))
+  const resultado = await getDocs(consulta)
+
+  return resultado.docs
+    .map((documento) => converterDocumento(documento.id, documento.data()))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+}
+
 export async function buscarProdutoPorId(id: string): Promise<Produto | null> {
   const resultado = await getDoc(doc(db, 'produtos', id))
   return resultado.exists() ? converterDocumento(resultado.id, resultado.data()) : null
@@ -43,7 +53,7 @@ export async function buscarProdutoPorId(id: string): Promise<Produto | null> {
 
 /**
  * O UUID é usado como ID do documento e como conteúdo do QR Code.
- * A transação evita sobrescrever um documento caso ocorra uma colisão de ID.
+ * A transação impede sobrescrever um documento caso ocorra colisão do identificador.
  */
 export async function criarProduto(
   artesaoId: string,
@@ -72,7 +82,7 @@ export async function criarProduto(
   return qrCodeId
 }
 
-/** Atualiza somente os campos editáveis; o proprietário e o QR Code são imutáveis. */
+/** Atualiza os campos editáveis; o proprietário e o QR Code são imutáveis. */
 export async function atualizarProduto(
   id: string,
   artesaoId: string,

@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard'
 import Produtos from './pages/Produtos'
 import CadastroProduto from './pages/CadastroProduto'
 import ProdutoQrCode from './pages/ProdutoQrCode'
+import RegistrarVenda from './pages/RegistrarVenda'
 import EmBreve from './pages/EmBreve'
 
 export default function App() {
@@ -24,7 +25,7 @@ export default function App() {
               <Route path="/produtos/novo" element={<CadastroProduto />} />
               <Route path="/produtos/:id/editar" element={<CadastroProduto />} />
               <Route path="/produtos/:id/qrcode" element={<ProdutoQrCode />} />
-              <Route path="/vendas/nova" element={<EmBreve titulo="Nova venda" />} />
+              <Route path="/vendas/nova" element={<RegistrarVenda />} />
               <Route path="/vendas/historico" element={<EmBreve titulo="Histórico de vendas" />} />
               <Route path="/perfil" element={<EmBreve titulo="Perfil" />} />
             </Route>
