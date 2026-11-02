@@ -110,7 +110,15 @@ service cloud.firestore {
                     && request.resource.data.diff(resource.data).affectedKeys()
                        .hasOnly(['nome', 'telefone', 'id', 'uid'])
                     && request.resource.data.id is int
-                    && request.resource.data.uid == uid;
+                    && request.resource.data.uid == uid
+                    && (
+                      !resource.data.keys().hasAny(['id'])
+                      || request.resource.data.id == resource.data.id
+                    )
+                    && (
+                      !resource.data.keys().hasAny(['uid'])
+                      || request.resource.data.uid == resource.data.uid
+                    );
 
       allow delete: if false;
     }
