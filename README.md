@@ -29,8 +29,9 @@ firebase deploy --only firestore:rules
 - [x] 3. Products and QR codes (catalog, create/update/deactivate, UUID QR, download and print)
 - [x] 4. Sales (camera scanner, manual lookup, atomic sale and stock update)
 - [x] 5. Dashboard and history (sales metrics, 7/30-day charts, recent sales, best sellers)
-- [x] 6. Firestore Security Rules tests and final adjustments
-- [ ] 7. Firebase Hosting and production Firestore deployment
+- [x] 6. Artisan profile (edit name and phone, update Firebase Auth profile, sign out)
+- [x] 7. Firestore Security Rules tests and final adjustments
+- [ ] 8. Firebase Hosting and production Firestore deployment
 
 ## Firestore data model
 

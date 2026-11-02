@@ -10,6 +10,7 @@ import CadastroProduto from './pages/CadastroProduto'
 import ProdutoQrCode from './pages/ProdutoQrCode'
 import RegistrarVenda from './pages/RegistrarVenda'
 import HistoricoVendas from './pages/HistoricoVendas'
+import Perfil from './pages/Perfil'
 import EmBreve from './pages/EmBreve'
 
 export default function App() {
@@ -28,7 +29,7 @@ export default function App() {
               <Route path="/produtos/:id/qrcode" element={<ProdutoQrCode />} />
               <Route path="/vendas/nova" element={<RegistrarVenda />} />
               <Route path="/vendas/historico" element={<HistoricoVendas />} />
-              <Route path="/perfil" element={<EmBreve titulo="Perfil" />} />
+              <Route path="/perfil" element={<Perfil />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

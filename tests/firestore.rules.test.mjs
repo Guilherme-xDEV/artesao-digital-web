@@ -69,7 +69,7 @@ async function seedProfile(uid) {
   })
 }
 
-test('artisan profile is readable only by its owner', async () => {
+test('artisan profile can only be read and updated by its owner', async () => {
   await seedProfile(ownerId)
 
   const ownerDb = environment.authenticatedContext(ownerId).firestore()
@@ -77,6 +77,18 @@ test('artisan profile is readable only by its owner', async () => {
 
   await assertSucceeds(getDoc(doc(ownerDb, 'artesaos', ownerId)))
   await assertFails(getDoc(doc(sellerDb, 'artesaos', ownerId)))
+
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, 'artesaos', ownerId), {
+      nome: 'Updated artisan',
+      telefone: '(88) 99999-9999',
+    }),
+  )
+  await assertFails(
+    updateDoc(doc(sellerDb, 'artesaos', ownerId), {
+      nome: 'Unauthorized update',
+    }),
+  )
 })
 
 test('product creation requires ownership and matching QR document ID', async () => {

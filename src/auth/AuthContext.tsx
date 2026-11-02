@@ -8,7 +8,7 @@ import {
   updateProfile,
   type User,
 } from 'firebase/auth'
-import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { auth, db, googleProvider } from '../lib/firebase'
 import type { Artesao } from '../types/domain'
 
@@ -19,6 +19,11 @@ interface CadastroDados {
   senha: string
 }
 
+interface PerfilDados {
+  nome: string
+  telefone: string
+}
+
 interface AuthContextValue {
   user: User | null
   artesao: Artesao | null
@@ -26,6 +31,7 @@ interface AuthContextValue {
   entrar: (email: string, senha: string) => Promise<void>
   entrarComGoogle: () => Promise<void>
   cadastrar: (dados: CadastroDados) => Promise<void>
+  atualizarPerfil: (dados: PerfilDados) => Promise<void>
   sair: () => Promise<void>
 }
 
@@ -88,6 +94,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         telefone,
         email,
         criadoEm: serverTimestamp(),
+      })
+    },
+    atualizarPerfil: async ({ nome, telefone }) => {
+      const u = auth.currentUser
+      if (!u) throw new Error('Sua sessão não está disponível. Entre novamente.')
+
+      await updateProfile(u, { displayName: nome })
+      await updateDoc(doc(db, 'artesaos', u.uid), {
+        nome,
+        telefone,
       })
     },
     sair: () => signOut(auth),
