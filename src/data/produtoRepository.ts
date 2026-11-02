@@ -80,6 +80,35 @@ async function obterIdLegadoDoArtesao(uid: string): Promise<number> {
   return typeof id === 'number' && Number.isSafeInteger(id) ? id : idNumericoDoUid(uid)
 }
 
+/** Backfill identity metadata on web-created documents from the first deployed web version. */
+async function migrarIdentificadoresCanonicos(
+  documento: QueryDocumentSnapshot<DocumentData>,
+  artesaoId: string,
+): Promise<void> {
+  const dados = documento.data()
+  const atualizacoes: Record<string, unknown> = {}
+
+  if (typeof dados.id !== 'number') {
+    atualizacoes.id = idNumericoDoDocumento(documento.id)
+  }
+  if (dados.firestoreId !== documento.id) {
+    atualizacoes.firestoreId = documento.id
+  }
+  if (typeof dados.qrCodeId !== 'string') {
+    atualizacoes.qrCodeId = documento.id
+  }
+
+  if (Object.keys(atualizacoes).length > 0) {
+    atualizacoes.atualizadoEm = serverTimestamp()
+    await updateDoc(documento.ref, atualizacoes)
+  }
+
+  // This guard makes the intended owner explicit if the query logic changes later.
+  if (dados.artesaoId !== artesaoId) {
+    throw new Error('Não é possível migrar identificadores de um produto de outro artesão.')
+  }
+}
+
 /** Convert a legacy Android product in place without changing its document ID or QR value. */
 async function migrarDocumentoLegado(
   documento: DocumentSnapshot<DocumentData>,
@@ -123,15 +152,22 @@ export async function listarProdutosDoArtesao(
     documentos.set(documento.id, documento)
   }
 
-  await Promise.all(
-    legados.docs.map(async (documento) => {
+  await Promise.all([
+    ...canonicos.docs.map(async (documento) => {
+      try {
+        await migrarIdentificadoresCanonicos(documento, artesaoId)
+      } catch {
+        // Keep the record readable; identity metadata is retried on the next catalog load.
+      }
+    }),
+    ...legados.docs.map(async (documento) => {
       try {
         await migrarDocumentoLegado(documento, artesaoId, artesaoNome)
       } catch {
         // Keep the legacy record readable; a later explicit retry can finish migration.
       }
     }),
-  )
+  ])
 
   return [...documentos.values()]
     .map(converterDocumento)
