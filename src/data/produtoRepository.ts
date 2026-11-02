@@ -31,6 +31,15 @@ function idNumericoDoUid(uid: string): number {
   return hash & 0x7fffffff
 }
 
+/** Matches Kotlin String.hashCode() for the Android local compatibility key. */
+function idNumericoDoDocumento(documentId: string): number {
+  let hash = 0
+  for (let index = 0; index < documentId.length; index += 1) {
+    hash = (Math.imul(hash, 31) + documentId.charCodeAt(index)) | 0
+  }
+  return hash & 0x7fffffff
+}
+
 function paraCentavos(dados: DocumentData): number {
   const canonico = dados.precoCentavos
   if (typeof canonico === 'number' && Number.isSafeInteger(canonico)) return canonico
@@ -86,7 +95,7 @@ async function migrarDocumentoLegado(
   }
 
   await updateDoc(documento.ref, {
-    id: typeof dados.id === 'number' ? dados.id : idNumericoDoUid(documento.id),
+    id: typeof dados.id === 'number' ? dados.id : idNumericoDoDocumento(documento.id),
     firestoreId: documento.id,
     artesaoId: uid,
     artesaoNome: typeof dados.artesaoNome === 'string' ? dados.artesaoNome : artesaoNome,
@@ -177,6 +186,7 @@ export async function criarProduto(
 
     transacao.set(referencia, {
       ...dados,
+      id: idNumericoDoDocumento(referencia.id),
       firestoreId: referencia.id,
       artesaoId,
       artesaoNome,
