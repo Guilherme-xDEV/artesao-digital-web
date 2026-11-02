@@ -34,7 +34,10 @@ export default function CadastroProduto() {
       try {
         const produto = await buscarProdutoPorId(id)
         if (!ativo) return
-        if (!produto || produto.artesaoId !== user.uid) {
+        if (
+          !produto ||
+          (produto.artesaoId !== user.uid && produto.artesaoId !== artesao?.id)
+        ) {
           navigate('/produtos', { replace: true })
           return
         }
@@ -52,7 +55,7 @@ export default function CadastroProduto() {
     return () => {
       ativo = false
     }
-  }, [id, user, navigate])
+  }, [id, user, artesao?.id, navigate])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

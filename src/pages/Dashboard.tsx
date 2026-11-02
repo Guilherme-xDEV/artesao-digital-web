@@ -57,7 +57,7 @@ export default function Dashboard() {
     setErro('')
     try {
       const [listaProdutos, listaVendas] = await Promise.all([
-        listarProdutosDoArtesao(user.uid),
+        listarProdutosDoArtesao(user.uid, artesao?.nome || user.displayName || user.email || 'Artesão'),
         listarVendasDoArtesao(user.uid),
       ])
       setProdutos(listaProdutos)
@@ -67,7 +67,7 @@ export default function Dashboard() {
     } finally {
       setCarregando(false)
     }
-  }, [user])
+  }, [user, artesao?.nome])
 
   useEffect(() => {
     void carregar()

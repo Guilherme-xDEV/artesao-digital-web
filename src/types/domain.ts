@@ -1,22 +1,28 @@
 import type { Timestamp } from 'firebase/firestore'
 
-/** artesaos/{uid} — o id do documento é o uid do Firebase Auth. */
+/** artesaos/{uid}; the document ID is the Firebase Auth UID. */
 export interface Artesao {
-  id: string
+  id?: number
+  uid?: string
   nome: string
   telefone: string
   email: string
   criadoEm?: Timestamp
 }
 
-/** produtos/{id}; o ID do documento é o UUID codificado no QR Code. */
+/**
+ * produtos/{documentId}. firestoreId always identifies the persisted document.
+ * New documents use the QR UUID as their document ID; legacy documents retain
+ * their original document ID so existing QR labels and references keep working.
+ */
 export interface Produto {
   id: string
+  firestoreId: string
   nome: string
   descricao: string
   precoCentavos: number
   quantidadeEstoque: number
-  artesaoId: string
+  artesaoId: string | number
   artesaoNome: string
   qrCodeId: string
   ativo: boolean
@@ -24,12 +30,12 @@ export interface Produto {
   criadoEm?: Timestamp
 }
 
-/** vendas/{id} — imutável pelas Security Rules. */
+/** vendas/{id}. Legacy records may retain numeric artisan IDs and string dates. */
 export interface Venda {
   id: string
   produtoId: string
   produtoNome: string
-  artesaoId: string
+  artesaoId: string | number
   artesaoNome: string
   vendedorId: string
   vendedorNome: string

@@ -8,7 +8,7 @@ import type { Produto } from '../types/domain'
 type Filtro = 'ativos' | 'todos' | 'inativos'
 
 export default function Produtos() {
-  const { user } = useAuth()
+  const { user, artesao } = useAuth()
   const [produtos, setProdutos] = useState<Produto[]>([])
   const [filtro, setFiltro] = useState<Filtro>('ativos')
   const [busca, setBusca] = useState('')
@@ -21,13 +21,13 @@ export default function Produtos() {
     setCarregando(true)
     setErro('')
     try {
-      setProdutos(await listarProdutosDoArtesao(user.uid))
+      setProdutos(await listarProdutosDoArtesao(user.uid, artesao?.nome || user.displayName || user.email || 'Artesão'))
     } catch {
       setErro('Não foi possível carregar seus produtos. Verifique a conexão e tente novamente.')
     } finally {
       setCarregando(false)
     }
-  }, [user])
+  }, [user, artesao?.nome])
 
   useEffect(() => {
     void carregar()

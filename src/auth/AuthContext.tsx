@@ -37,6 +37,26 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+/** Keep the numeric legacy ID compatible with Kotlin String.hashCode(). */
+function idNumericoDoUid(uid: string): number {
+  let hash = 0
+  for (let index = 0; index < uid.length; index += 1) {
+    hash = (Math.imul(hash, 31) + uid.charCodeAt(index)) | 0
+  }
+  return hash & 0x7fffffff
+}
+
+function dadosBasicosDoUsuario(u: User) {
+  return {
+    id: idNumericoDoUid(u.uid),
+    uid: u.uid,
+    nome: u.displayName ?? '',
+    telefone: '',
+    email: u.email ?? '',
+    criadoEm: serverTimestamp(),
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [artesao, setArtesao] = useState<Artesao | null>(null)
@@ -44,24 +64,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelarPerfil: (() => void) | undefined
+    let ativo = true
+
     const cancelarAuth = onAuthStateChanged(auth, (u) => {
       cancelarPerfil?.()
+      cancelarPerfil = undefined
       setUser(u)
+
       if (!u) {
         setArtesao(null)
         setCarregando(false)
         return
       }
-      cancelarPerfil = onSnapshot(
-        doc(db, 'artesaos', u.uid),
-        (snap) => {
-          setArtesao(snap.exists() ? ({ id: snap.id, ...snap.data() } as Artesao) : null)
-          setCarregando(false)
-        },
-        () => setCarregando(false),
-      )
+
+      setCarregando(true)
+      const referencia = doc(db, 'artesaos', u.uid)
+
+      void (async () => {
+        const perfil = await getDoc(referencia)
+        if (perfil.exists()) {
+          const dados = perfil.data()
+          if (typeof dados.id !== 'number' || dados.uid !== u.uid) {
+            await updateDoc(referencia, {
+              id: idNumericoDoUid(u.uid),
+              uid: u.uid,
+            })
+          }
+        }
+
+        if (!ativo || auth.currentUser?.uid !== u.uid) return
+        cancelarPerfil = onSnapshot(
+          referencia,
+          (snap) => {
+            setArtesao(snap.exists() ? ({ ...snap.data(), uid: snap.id } as Artesao) : null)
+            setCarregando(false)
+          },
+          () => setCarregando(false),
+        )
+      })().catch(() => {
+        if (ativo && auth.currentUser?.uid === u.uid) setCarregando(false)
+      })
     })
+
     return () => {
+      ativo = false
       cancelarAuth()
       cancelarPerfil?.()
     }
@@ -76,13 +122,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     entrarComGoogle: async () => {
       const { user: u } = await signInWithPopup(auth, googleProvider)
-      const ref = doc(db, 'artesaos', u.uid)
-      if (!(await getDoc(ref)).exists()) {
-        await setDoc(ref, {
-          nome: u.displayName ?? '',
-          telefone: '',
-          email: u.email ?? '',
-          criadoEm: serverTimestamp(),
+      const referencia = doc(db, 'artesaos', u.uid)
+      const existente = await getDoc(referencia)
+      if (!existente.exists()) {
+        await setDoc(referencia, dadosBasicosDoUsuario(u))
+      } else if (typeof existente.data().id !== 'number' || existente.data().uid !== u.uid) {
+        await updateDoc(referencia, {
+          id: idNumericoDoUid(u.uid),
+          uid: u.uid,
         })
       }
     },
@@ -90,10 +137,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user: u } = await createUserWithEmailAndPassword(auth, email, senha)
       await updateProfile(u, { displayName: nome })
       await setDoc(doc(db, 'artesaos', u.uid), {
+        ...dadosBasicosDoUsuario(u),
         nome,
         telefone,
         email,
-        criadoEm: serverTimestamp(),
       })
     },
     atualizarPerfil: async ({ nome, telefone }) => {

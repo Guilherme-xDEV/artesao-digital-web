@@ -3,7 +3,7 @@ import { Html5QrcodeScanner } from 'html5-qrcode'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import {
-  buscarProdutoPorId,
+  buscarProdutoPorQrCode,
   listarProdutosAtivos,
 } from '../data/produtoRepository'
 import { registrarVenda, VendaError } from '../data/vendaRepository'
@@ -81,7 +81,7 @@ export default function RegistrarVenda() {
     setErro('')
     setMensagem('')
     try {
-      const encontrado = await buscarProdutoPorId(qrCodeId.trim())
+      const encontrado = await buscarProdutoPorQrCode(qrCodeId.trim())
       if (!encontrado) {
         setErro('QR Code não reconhecido. Confira se a etiqueta pertence a um produto cadastrado.')
         return

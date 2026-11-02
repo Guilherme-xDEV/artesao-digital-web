@@ -6,82 +6,208 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function dono(uid) {
-      return logado() && request.auth.uid == uid;
+    function perfilPath(uid) {
+      return /databases/$(database)/documents/artesaos/$(uid);
+    }
+
+    // Numeric artisan IDs are retained only to recognize documents written by
+    // older Android builds. New writes always use the Firebase Auth UID.
+    function donoPorIdentificador(artesaoId) {
+      return logado() && (
+        artesaoId == request.auth.uid
+        || (
+          artesaoId is int
+          && exists(perfilPath(request.auth.uid))
+          && get(perfilPath(request.auth.uid)).data.id == artesaoId
+        )
+      );
     }
 
     function produtoPath(produtoId) {
       return /databases/$(database)/documents/produtos/$(produtoId);
     }
 
-    // Personal profile data is private to its owner.
-    match /artesaos/{uid} {
-      allow read: if dono(uid);
-      allow create: if dono(uid)
-                    && request.resource.data.keys().hasOnly([
-                      'nome', 'telefone', 'email', 'criadoEm'
-                    ])
-                    && request.resource.data.nome is string
-                    && request.resource.data.email is string;
-      allow update: if dono(uid)
-                    && request.resource.data.diff(resource.data).affectedKeys()
-                       .hasOnly(['nome', 'telefone']);
-      allow delete: if false;
+    function precoProdutoValido(data) {
+      return (
+        data.keys().hasAny(['precoCentavos'])
+        && data.precoCentavos is int
+        && data.precoCentavos > 0
+      ) || (
+        data.keys().hasAny(['preco'])
+        && data.preco is number
+        && data.preco > 0
+      );
     }
 
-    // Authenticated artisans can identify products during a sale.
-    // The document ID is the UUID encoded in the product QR code.
-    match /produtos/{id} {
-      allow read: if logado();
+    function precoProdutoEmCentavos(data) {
+      return data.keys().hasAny(['precoCentavos'])
+        ? data.precoCentavos
+        : math.round(data.preco * 100);
+    }
 
-      allow create: if dono(request.resource.data.artesaoId)
-                    && request.resource.data.keys().hasOnly([
-                      'nome', 'descricao', 'precoCentavos', 'quantidadeEstoque',
-                      'artesaoId', 'artesaoNome', 'qrCodeId', 'ativo', 'criadoEm'
-                    ])
-                    && request.resource.data.nome is string
-                    && request.resource.data.nome.size() >= 2
-                    && request.resource.data.nome.size() <= 100
-                    && request.resource.data.descricao is string
-                    && request.resource.data.descricao.size() <= 500
-                    && request.resource.data.artesaoNome is string
-                    && request.resource.data.qrCodeId == id
-                    && request.resource.data.ativo == true
-                    && request.resource.data.precoCentavos is int
-                    && request.resource.data.precoCentavos > 0
-                    && request.resource.data.quantidadeEstoque is int
-                    && request.resource.data.quantidadeEstoque >= 0
-                    && request.resource.data.criadoEm == request.time;
+    function produtoValido(data) {
+      return data.nome is string
+        && data.nome.size() >= 2
+        && data.nome.size() <= 100
+        && data.descricao is string
+        && data.descricao.size() <= 500
+        && precoProdutoValido(data)
+        && data.quantidadeEstoque is int
+        && data.quantidadeEstoque >= 0
+        && data.ativo is bool;
+    }
 
-      // The owner can edit product details without changing its identity.
-      // A different artisan can only decrease stock as part of the matching
-      // sale transaction.
-      allow update: if logado()
-                    && request.resource.data.artesaoId == resource.data.artesaoId
-                    && request.resource.data.qrCodeId == resource.data.qrCodeId
-                    && request.resource.data.nome is string
-                    && request.resource.data.nome.size() >= 2
-                    && request.resource.data.nome.size() <= 100
-                    && request.resource.data.descricao is string
-                    && request.resource.data.descricao.size() <= 500
-                    && request.resource.data.precoCentavos is int
-                    && request.resource.data.precoCentavos > 0
-                    && request.resource.data.quantidadeEstoque is int
-                    && request.resource.data.quantidadeEstoque >= 0
-                    && request.resource.data.ativo is bool
+    // Compatibility for the first deployed web bundle, which did not write
+    // the numeric id/firestoreId metadata yet.
+    function produtoWebLegadoValido(documentId) {
+      return request.resource.data.artesaoId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'nome', 'descricao', 'precoCentavos', 'quantidadeEstoque',
+          'artesaoId', 'artesaoNome', 'qrCodeId', 'ativo', 'criadoEm'
+        ])
+        && produtoValido(request.resource.data)
+        && request.resource.data.artesaoNome is string
+        && request.resource.data.qrCodeId == documentId
+        && request.resource.data.ativo == true
+        && request.resource.data.precoCentavos is int
+        && request.resource.data.criadoEm == request.time;
+    }
+
+    // Compatibility for Android builds that still write decimal reais and
+    // numeric artisan IDs. Ownership is checked against the signed-in profile.
+    function produtoAndroidLegadoValido(documentId) {
+      return request.resource.data.artesaoId is int
+        && donoPorIdentificador(request.resource.data.artesaoId)
+        && request.resource.data.keys().hasOnly([
+          'id', 'firestoreId', 'nome', 'descricao', 'preco',
+          'quantidadeEstoque', 'artesaoId', 'qrCodeId', 'ativo'
+        ])
+        && produtoValido(request.resource.data)
+        && request.resource.data.id is int
+        && request.resource.data.firestoreId == documentId
+        && request.resource.data.qrCodeId is string
+        && request.resource.data.ativo == true
+        && request.resource.data.preco is number;
+    }
+
+    match /artesaos/{uid} {
+      allow read: if logado() && request.auth.uid == uid;
+
+      allow create: if logado()
+                    && request.auth.uid == uid
                     && (
                       (
-                        dono(resource.data.artesaoId)
-                        && request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['nome', 'descricao', 'precoCentavos',
-                                     'quantidadeEstoque', 'ativo',
-                                     'atualizadoEm', 'ultimaVendaId'])
+                        request.resource.data.keys().hasOnly([
+                          'id', 'uid', 'nome', 'telefone', 'email', 'criadoEm'
+                        ])
+                        && request.resource.data.id is int
+                        && request.resource.data.uid == uid
+                        && request.resource.data.nome is string
+                        && request.resource.data.email is string
                       )
                       ||
                       (
-                        !dono(resource.data.artesaoId)
+                        request.resource.data.keys().hasOnly([
+                          'nome', 'telefone', 'email', 'criadoEm'
+                        ])
+                        && request.resource.data.nome is string
+                        && request.resource.data.email is string
+                      )
+                    );
+
+      // id/uid are backfilled once for profiles originally created by the web
+      // app, allowing old numeric product ownership to be migrated safely.
+      allow update: if logado()
+                    && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['nome', 'telefone', 'id', 'uid'])
+                    && (
+                      !request.resource.data.keys().hasAny(['id'])
+                      || request.resource.data.id is int
+                    )
+                    && (
+                      !request.resource.data.keys().hasAny(['uid'])
+                      || request.resource.data.uid == uid
+                    )
+                    && (
+                      !resource.data.keys().hasAny(['id'])
+                      || request.resource.data.id == resource.data.id
+                    )
+                    && (
+                      !resource.data.keys().hasAny(['uid'])
+                      || request.resource.data.uid == resource.data.uid
+                    );
+
+      allow delete: if false;
+    }
+
+    match /produtos/{id} {
+      allow read: if logado();
+
+      // Canonical writes plus narrow compatibility for already-deployed clients.
+      allow create: if logado() && (
+        (
+          request.resource.data.artesaoId == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'id', 'firestoreId', 'nome', 'descricao',
+            'precoCentavos', 'quantidadeEstoque',
+            'artesaoId', 'artesaoNome', 'qrCodeId',
+            'ativo', 'criadoEm'
+          ])
+          && produtoValido(request.resource.data)
+          && request.resource.data.artesaoNome is string
+          && request.resource.data.qrCodeId == id
+          && request.resource.data.ativo == true
+          && request.resource.data.precoCentavos is int
+          && request.resource.data.criadoEm == request.time
+          && request.resource.data.id is int
+          && request.resource.data.firestoreId == id
+        )
+        || produtoWebLegadoValido(id)
+        || produtoAndroidLegadoValido(id)
+      );
+
+      allow update: if logado()
+                    && produtoValido(request.resource.data)
+                    && request.resource.data.qrCodeId == resource.data.qrCodeId
+                    && (
+                      !resource.data.keys().hasAny(['id'])
+                      || request.resource.data.id == resource.data.id
+                    )
+                    && (
+                      !request.resource.data.keys().hasAny(['firestoreId'])
+                      || request.resource.data.firestoreId == id
+                    )
+                    && (
+                      (
+                        donoPorIdentificador(resource.data.artesaoId)
+                        && (
+                          request.resource.data.artesaoId == resource.data.artesaoId
+                          || (
+                            resource.data.artesaoId is int
+                            && request.resource.data.artesaoId == request.auth.uid
+                          )
+                        )
                         && request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['quantidadeEstoque', 'atualizadoEm', 'ultimaVendaId'])
+                           .hasOnly([
+                             'id', 'firestoreId', 'nome', 'descricao',
+                             'preco', 'precoCentavos', 'quantidadeEstoque',
+                             'artesaoId', 'artesaoNome', 'qrCodeId', 'ativo',
+                             'atualizadoEm', 'ultimaVendaId'
+                           ])
+                        && (
+                          !resource.data.keys().hasAny(['artesaoNome'])
+                          || request.resource.data.artesaoNome is string
+                        )
+                      )
+                      ||
+                      (
+                        !donoPorIdentificador(resource.data.artesaoId)
+                        && request.resource.data.artesaoId == resource.data.artesaoId
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly([
+                             'quantidadeEstoque', 'atualizadoEm', 'ultimaVendaId'
+                           ])
                         && request.resource.data.quantidadeEstoque < resource.data.quantidadeEstoque
                         && request.resource.data.ultimaVendaId is string
                         && existsAfter(/databases/$(database)/documents/vendas/$(request.resource.data.ultimaVendaId))
@@ -95,11 +221,12 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Sales are append-only. Sale snapshots and stock decrements must match.
     match /vendas/{id} {
       allow read: if logado()
-                  && (resource.data.vendedorId == request.auth.uid
-                      || resource.data.artesaoId == request.auth.uid);
+                  && (
+                    resource.data.vendedorId == request.auth.uid
+                    || donoPorIdentificador(resource.data.artesaoId)
+                  );
 
       allow create: if logado()
                     && request.resource.data.keys().hasOnly([
@@ -109,7 +236,10 @@ service cloud.firestore {
                     ])
                     && request.resource.data.produtoId is string
                     && request.resource.data.produtoNome is string
-                    && request.resource.data.artesaoId is string
+                    && (
+                      request.resource.data.artesaoId is string
+                      || request.resource.data.artesaoId is int
+                    )
                     && request.resource.data.artesaoNome is string
                     && request.resource.data.vendedorId == request.auth.uid
                     && request.resource.data.vendedorNome is string
@@ -125,8 +255,12 @@ service cloud.firestore {
                     && get(produtoPath(request.resource.data.produtoId)).data.ativo == true
                     && get(produtoPath(request.resource.data.produtoId)).data.nome == request.resource.data.produtoNome
                     && get(produtoPath(request.resource.data.produtoId)).data.artesaoId == request.resource.data.artesaoId
-                    && get(produtoPath(request.resource.data.produtoId)).data.artesaoNome == request.resource.data.artesaoNome
-                    && get(produtoPath(request.resource.data.produtoId)).data.precoCentavos == request.resource.data.precoUnitarioCentavos
+                    && (
+                      !get(produtoPath(request.resource.data.produtoId)).data.keys().hasAny(['artesaoNome'])
+                      || get(produtoPath(request.resource.data.produtoId)).data.artesaoNome == request.resource.data.artesaoNome
+                    )
+                    && precoProdutoEmCentavos(get(produtoPath(request.resource.data.produtoId)).data) ==
+                       request.resource.data.precoUnitarioCentavos
                     && getAfter(produtoPath(request.resource.data.produtoId)).data.quantidadeEstoque ==
                        get(produtoPath(request.resource.data.produtoId)).data.quantidadeEstoque - request.resource.data.quantidade
                     && getAfter(produtoPath(request.resource.data.produtoId)).data.ultimaVendaId == id;
