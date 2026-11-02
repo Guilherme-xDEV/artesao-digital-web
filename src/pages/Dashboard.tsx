@@ -67,7 +67,7 @@ export default function Dashboard() {
     } finally {
       setCarregando(false)
     }
-  }, [user])
+  }, [user, artesao?.nome])
 
   useEffect(() => {
     void carregar()
