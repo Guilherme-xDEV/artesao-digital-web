@@ -146,6 +146,12 @@ test('only the product owner can edit or deactivate it; direct seller stock edit
   )
 
   await assertFails(
+    updateDoc(doc(ownerDb, 'produtos', productId), {
+      id: 999999,
+    }),
+  )
+
+  await assertFails(
     updateDoc(doc(sellerDb, 'produtos', productId), {
       quantidadeEstoque: 4,
     }),
