@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         cancelarPerfil = onSnapshot(
           referencia,
           (snap) => {
-            setArtesao(snap.exists() ? ({ id: snap.id, ...snap.data() } as Artesao) : null)
+            setArtesao(snap.exists() ? ({ ...snap.data(), uid: snap.id } as Artesao) : null)
             setCarregando(false)
           },
           () => setCarregando(false),
