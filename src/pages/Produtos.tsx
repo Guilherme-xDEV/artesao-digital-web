@@ -27,7 +27,7 @@ export default function Produtos() {
     } finally {
       setCarregando(false)
     }
-  }, [user])
+  }, [user, artesao?.nome])
 
   useEffect(() => {
     void carregar()
