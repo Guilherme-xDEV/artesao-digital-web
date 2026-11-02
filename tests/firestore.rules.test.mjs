@@ -132,6 +132,49 @@ test('product creation requires ownership and matching QR document ID', async ()
   )
 })
 
+test('first deployed web client can create a product during the compatibility window', async () => {
+  await seedProfile(ownerId)
+
+  const legacyWebProductId = 'legacy-web-create-uuid'
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
+
+  await assertSucceeds(
+    setDoc(doc(ownerDb, 'produtos', legacyWebProductId), {
+      nome: 'First-generation web product',
+      descricao: 'Created by the deployed web bundle before compatibility metadata',
+      precoCentavos: 1999,
+      quantidadeEstoque: 4,
+      artesaoId: ownerId,
+      artesaoNome: 'Product Owner',
+      qrCodeId: legacyWebProductId,
+      ativo: true,
+      criadoEm: serverTimestamp(),
+    }),
+  )
+})
+
+test('previous Android client can create a numeric-owner decimal-price product during rollout', async () => {
+  const numericOwnerId = 924681
+  await seedProfile(ownerId, numericOwnerId)
+
+  const legacyAndroidProductId = 'legacy-android-create-document'
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
+
+  await assertSucceeds(
+    setDoc(doc(ownerDb, 'produtos', legacyAndroidProductId), {
+      id: 77126,
+      firestoreId: legacyAndroidProductId,
+      nome: 'Previous Android product',
+      descricao: 'Created before UID and integer-cent migration',
+      preco: 10.99,
+      quantidadeEstoque: 3,
+      artesaoId: numericOwnerId,
+      qrCodeId: 'legacy-android-create-qr',
+      ativo: true,
+    }),
+  )
+})
+
 test('only the product owner can edit or deactivate it; direct seller stock edits fail', async () => {
   await seedProduct()
 
