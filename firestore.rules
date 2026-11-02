@@ -131,7 +131,10 @@ service cloud.firestore {
                              'artesaoId', 'artesaoNome', 'qrCodeId', 'ativo',
                              'atualizadoEm', 'ultimaVendaId'
                            ])
-                        && request.resource.data.artesaoNome is string
+                        && (
+                          !resource.data.keys().hasAny(['artesaoNome'])
+                          || request.resource.data.artesaoNome is string
+                        )
                       )
                       ||
                       (
