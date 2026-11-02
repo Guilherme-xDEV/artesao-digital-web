@@ -107,6 +107,10 @@ service cloud.firestore {
                     && produtoValido(request.resource.data)
                     && request.resource.data.qrCodeId == resource.data.qrCodeId
                     && (
+                      !resource.data.keys().hasAny(['id'])
+                      || request.resource.data.id == resource.data.id
+                    )
+                    && (
                       !request.resource.data.keys().hasAny(['firestoreId'])
                       || request.resource.data.firestoreId == id
                     )
