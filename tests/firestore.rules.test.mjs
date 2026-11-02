@@ -11,7 +11,6 @@ import {
   deleteDoc,
   doc,
   getDoc,
-  getFirestore,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -56,7 +55,7 @@ after(async () => {
 
 async function seedProduct() {
   await environment.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(getFirestore(context), 'produtos', productId), productFixture)
+    await setDoc(doc(context.firestore(), 'produtos', productId), productFixture)
   })
 }
 
@@ -73,8 +72,8 @@ async function seedProfile(uid) {
 test('artisan profile is readable only by its owner', async () => {
   await seedProfile(ownerId)
 
-  const ownerDb = getFirestore(environment.authenticatedContext(ownerId))
-  const sellerDb = getFirestore(environment.authenticatedContext(sellerId))
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
+  const sellerDb = environment.authenticatedContext(sellerId).firestore()
 
   await assertSucceeds(getDoc(doc(ownerDb, 'artesaos', ownerId)))
   await assertFails(getDoc(doc(sellerDb, 'artesaos', ownerId)))
