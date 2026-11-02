@@ -42,7 +42,7 @@ service cloud.firestore {
     function precoProdutoEmCentavos(data) {
       return data.keys().hasAny(['precoCentavos'])
         ? data.precoCentavos
-        : int(data.preco * 100 + 0.5);
+        : math.round(data.preco * 100);
     }
 
     function produtoValido(data) {
