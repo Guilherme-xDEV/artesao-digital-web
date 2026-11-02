@@ -14,36 +14,61 @@ service cloud.firestore {
       return /databases/$(database)/documents/produtos/$(produtoId);
     }
 
-    // Artesãos: cada um lê e edita apenas o próprio perfil; nunca apaga.
+    // Personal profile data is private to its owner.
     match /artesaos/{uid} {
       allow read: if dono(uid);
-      allow create: if dono(uid);
-      allow update: if dono(uid);
+      allow create: if dono(uid)
+                    && request.resource.data.keys().hasOnly([
+                      'nome', 'telefone', 'email', 'criadoEm'
+                    ])
+                    && request.resource.data.nome is string
+                    && request.resource.data.email is string;
+      allow update: if dono(uid)
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['nome', 'telefone']);
       allow delete: if false;
     }
 
-    // Produtos: leitura autenticada permite identificar itens durante a venda.
-    // O ID do documento é o UUID codificado no QR Code.
+    // Authenticated artisans can identify products during a sale.
+    // The document ID is the UUID encoded in the product QR code.
     match /produtos/{id} {
       allow read: if logado();
 
       allow create: if dono(request.resource.data.artesaoId)
+                    && request.resource.data.keys().hasOnly([
+                      'nome', 'descricao', 'precoCentavos', 'quantidadeEstoque',
+                      'artesaoId', 'artesaoNome', 'qrCodeId', 'ativo', 'criadoEm'
+                    ])
+                    && request.resource.data.nome is string
+                    && request.resource.data.nome.size() >= 2
+                    && request.resource.data.nome.size() <= 100
+                    && request.resource.data.descricao is string
+                    && request.resource.data.descricao.size() <= 500
+                    && request.resource.data.artesaoNome is string
                     && request.resource.data.qrCodeId == id
                     && request.resource.data.ativo == true
                     && request.resource.data.precoCentavos is int
                     && request.resource.data.precoCentavos > 0
                     && request.resource.data.quantidadeEstoque is int
-                    && request.resource.data.quantidadeEstoque >= 0;
+                    && request.resource.data.quantidadeEstoque >= 0
+                    && request.resource.data.criadoEm == request.time;
 
-      // O proprietário edita os dados do produto sem alterar sua identidade.
-      // Outro artesão só baixa o estoque quando cria a venda correspondente
-      // na mesma transação do Firestore.
+      // The owner can edit product details without changing its identity.
+      // A different artisan can only decrease stock as part of the matching
+      // sale transaction.
       allow update: if logado()
                     && request.resource.data.artesaoId == resource.data.artesaoId
                     && request.resource.data.qrCodeId == resource.data.qrCodeId
+                    && request.resource.data.nome is string
+                    && request.resource.data.nome.size() >= 2
+                    && request.resource.data.nome.size() <= 100
+                    && request.resource.data.descricao is string
+                    && request.resource.data.descricao.size() <= 500
+                    && request.resource.data.precoCentavos is int
                     && request.resource.data.precoCentavos > 0
                     && request.resource.data.quantidadeEstoque is int
                     && request.resource.data.quantidadeEstoque >= 0
+                    && request.resource.data.ativo is bool
                     && (
                       (
                         dono(resource.data.artesaoId)
@@ -70,8 +95,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Vendas: somente criação; edição e exclusão são proibidas (irretratabilidade).
-    // O snapshot deve corresponder ao produto e à baixa de estoque na mesma transação.
+    // Sales are append-only. Sale snapshots and stock decrements must match.
     match /vendas/{id} {
       allow read: if logado()
                   && (resource.data.vendedorId == request.auth.uid
@@ -83,11 +107,17 @@ service cloud.firestore {
                       'vendedorId', 'vendedorNome', 'precoUnitarioCentavos',
                       'quantidade', 'totalCentavos', 'dataHora'
                     ])
+                    && request.resource.data.produtoId is string
+                    && request.resource.data.produtoNome is string
+                    && request.resource.data.artesaoId is string
+                    && request.resource.data.artesaoNome is string
                     && request.resource.data.vendedorId == request.auth.uid
+                    && request.resource.data.vendedorNome is string
                     && request.resource.data.quantidade is int
                     && request.resource.data.quantidade >= 1
                     && request.resource.data.precoUnitarioCentavos is int
                     && request.resource.data.precoUnitarioCentavos > 0
+                    && request.resource.data.totalCentavos is int
                     && request.resource.data.totalCentavos ==
                        request.resource.data.precoUnitarioCentavos * request.resource.data.quantidade
                     && request.resource.data.dataHora == request.time
