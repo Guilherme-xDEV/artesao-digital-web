@@ -11,6 +11,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  deleteField,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -59,9 +60,19 @@ async function seedProduct() {
   })
 }
 
-async function seedProfile(uid) {
+function legacyNumericId(uid) {
+  let hash = 0
+  for (let index = 0; index < uid.length; index += 1) {
+    hash = (Math.imul(hash, 31) + uid.charCodeAt(index)) | 0
+  }
+  return hash & 0x7fffffff
+}
+
+async function seedProfile(uid, id = legacyNumericId(uid)) {
   await environment.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'artesaos', uid), {
+      id,
+      uid,
       nome: uid,
       telefone: '',
       email: `${uid}@example.test`,
@@ -190,6 +201,68 @@ test('a sale and stock decrement are allowed only in the same transaction', asyn
   // Sales are append-only, even for the artisan who registered the sale.
   await assertFails(updateDoc(saleRef, { totalCentavos: 1 }))
   await assertFails(deleteDoc(saleRef))
+})
+
+
+test('legacy numeric product ownership and decimal price can be migrated in place', async () => {
+  const numericOwnerId = 924681
+  await seedProfile(ownerId, numericOwnerId)
+
+  const legacyDocumentId = 'legacy-firestore-document-id'
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'produtos', legacyDocumentId), {
+      id: 77123,
+      firestoreId: legacyDocumentId,
+      nome: 'Legacy ceramic vase',
+      descricao: 'Created by the previous Android schema',
+      preco: 45.5,
+      quantidadeEstoque: 7,
+      artesaoId: numericOwnerId,
+      qrCodeId: 'legacy-qr-uuid',
+      ativo: true,
+    })
+  })
+
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
+  const legacyRef = doc(ownerDb, 'produtos', legacyDocumentId)
+
+  await assertSucceeds(
+    updateDoc(legacyRef, {
+      artesaoId: ownerId,
+      artesaoNome: 'Product Owner',
+      firestoreId: legacyDocumentId,
+      precoCentavos: 4550,
+      preco: deleteField(),
+      atualizadoEm: serverTimestamp(),
+    }),
+  )
+
+  const migrated = await getDoc(legacyRef)
+  assert.equal(migrated.data().artesaoId, ownerId)
+  assert.equal(migrated.data().precoCentavos, 4550)
+  assert.equal(migrated.data().qrCodeId, 'legacy-qr-uuid')
+  assert.equal(migrated.id, legacyDocumentId)
+})
+
+test('artisan can read legacy sales with its numeric profile ID', async () => {
+  const numericOwnerId = 924681
+  await seedProfile(ownerId, numericOwnerId)
+
+  const saleId = 'legacy-sale'
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'vendas', saleId), {
+      id: 123,
+      artesaoId: numericOwnerId,
+      artesaoNome: 'Product Owner',
+      produtoNome: 'Legacy product',
+      quantidade: 1,
+      valorTotal: 12.5,
+      dataHora: '01/11/2026 15:30',
+    })
+  })
+
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
+  await assertSucceeds(getDoc(doc(ownerDb, 'vendas', saleId)))
 })
 
 test('sales cannot be forged', async () => {
