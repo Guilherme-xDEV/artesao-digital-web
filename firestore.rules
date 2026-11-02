@@ -100,14 +100,8 @@ service cloud.firestore {
                     && request.resource.data.ativo == true
                     && request.resource.data.precoCentavos is int
                     && request.resource.data.criadoEm == request.time
-                    && (
-                      !request.resource.data.keys().hasAny(['id'])
-                      || request.resource.data.id is int
-                    )
-                    && (
-                      !request.resource.data.keys().hasAny(['firestoreId'])
-                      || request.resource.data.firestoreId == id
-                    );
+                    && request.resource.data.id is int
+                    && request.resource.data.firestoreId == id;
 
       allow update: if logado()
                     && produtoValido(request.resource.data)
