@@ -95,13 +95,25 @@ service cloud.firestore {
 
       allow create: if logado()
                     && request.auth.uid == uid
-                    && request.resource.data.keys().hasOnly([
-                      'id', 'uid', 'nome', 'telefone', 'email', 'criadoEm'
-                    ])
-                    && request.resource.data.id is int
-                    && request.resource.data.uid == uid
-                    && request.resource.data.nome is string
-                    && request.resource.data.email is string;
+                    && (
+                      (
+                        request.resource.data.keys().hasOnly([
+                          'id', 'uid', 'nome', 'telefone', 'email', 'criadoEm'
+                        ])
+                        && request.resource.data.id is int
+                        && request.resource.data.uid == uid
+                        && request.resource.data.nome is string
+                        && request.resource.data.email is string
+                      )
+                      ||
+                      (
+                        request.resource.data.keys().hasOnly([
+                          'nome', 'telefone', 'email', 'criadoEm'
+                        ])
+                        && request.resource.data.nome is string
+                        && request.resource.data.email is string
+                      )
+                    );
 
       // id/uid are backfilled once for profiles originally created by the web
       // app, allowing old numeric product ownership to be migrated safely.
@@ -109,8 +121,14 @@ service cloud.firestore {
                     && request.auth.uid == uid
                     && request.resource.data.diff(resource.data).affectedKeys()
                        .hasOnly(['nome', 'telefone', 'id', 'uid'])
-                    && request.resource.data.id is int
-                    && request.resource.data.uid == uid
+                    && (
+                      !request.resource.data.keys().hasAny(['id'])
+                      || request.resource.data.id is int
+                    )
+                    && (
+                      !request.resource.data.keys().hasAny(['uid'])
+                      || request.resource.data.uid == uid
+                    )
                     && (
                       !resource.data.keys().hasAny(['id'])
                       || request.resource.data.id == resource.data.id
