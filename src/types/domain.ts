@@ -9,34 +9,32 @@ export interface Artesao {
   criadoEm?: Timestamp
 }
 
-/** produtos/{id} */
+/** produtos/{id}; o ID do documento é o UUID codificado no QR Code. */
 export interface Produto {
   id: string
   nome: string
   descricao: string
-  precoCentavos: number // > 0
-  quantidadeEstoque: number // >= 0
-  artesaoId: string // uid do dono
+  precoCentavos: number
+  quantidadeEstoque: number
+  artesaoId: string
   artesaoNome: string
-  qrCodeId: string // UUID codificado no QR
+  qrCodeId: string
   ativo: boolean
+  ultimaVendaId?: string
   criadoEm?: Timestamp
 }
 
-/**
- * vendas/{id} — imutável (somente create nas Security Rules).
- * Guarda snapshot de nome/preço para o histórico não mudar se o produto mudar.
- */
+/** vendas/{id} — imutável pelas Security Rules. */
 export interface Venda {
   id: string
   produtoId: string
   produtoNome: string
-  artesaoId: string // dono do produto
+  artesaoId: string
   artesaoNome: string
-  vendedorId: string // uid de quem registrou a venda (RF10)
+  vendedorId: string
   vendedorNome: string
   precoUnitarioCentavos: number
-  quantidade: number // >= 1
+  quantidade: number
   totalCentavos: number
   dataHora: Timestamp
 }

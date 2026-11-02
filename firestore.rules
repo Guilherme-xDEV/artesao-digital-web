@@ -2,43 +2,135 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function logado() { return request.auth != null; }
-    function dono(uid) { return logado() && request.auth.uid == uid; }
+    function logado() {
+      return request.auth != null;
+    }
 
-    // Artesãos: cada um lê e edita apenas o próprio perfil; nunca apaga.
+    function dono(uid) {
+      return logado() && request.auth.uid == uid;
+    }
+
+    function produtoPath(produtoId) {
+      return /databases/$(database)/documents/produtos/$(produtoId);
+    }
+
+    // Personal profile data is private to its owner.
     match /artesaos/{uid} {
-      allow read: if logado();
-      allow create: if dono(uid);
-      allow update: if dono(uid);
+      allow read: if dono(uid);
+      allow create: if dono(uid)
+                    && request.resource.data.keys().hasOnly([
+                      'nome', 'telefone', 'email', 'criadoEm'
+                    ])
+                    && request.resource.data.nome is string
+                    && request.resource.data.email is string;
+      allow update: if dono(uid)
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                       .hasOnly(['nome', 'telefone']);
       allow delete: if false;
     }
 
-    // Produtos: qualquer artesão autenticado lê (necessário para vender qualquer
-    // produto ativo); só o dono cria/edita; exclusão é lógica (campo "ativo").
+    // Authenticated artisans can identify products during a sale.
+    // The document ID is the UUID encoded in the product QR code.
     match /produtos/{id} {
       allow read: if logado();
+
       allow create: if dono(request.resource.data.artesaoId)
+                    && request.resource.data.keys().hasOnly([
+                      'nome', 'descricao', 'precoCentavos', 'quantidadeEstoque',
+                      'artesaoId', 'artesaoNome', 'qrCodeId', 'ativo', 'criadoEm'
+                    ])
+                    && request.resource.data.nome is string
+                    && request.resource.data.nome.size() >= 2
+                    && request.resource.data.nome.size() <= 100
+                    && request.resource.data.descricao is string
+                    && request.resource.data.descricao.size() <= 500
+                    && request.resource.data.artesaoNome is string
+                    && request.resource.data.qrCodeId == id
+                    && request.resource.data.ativo == true
+                    && request.resource.data.precoCentavos is int
                     && request.resource.data.precoCentavos > 0
-                    && request.resource.data.quantidadeEstoque >= 0;
-      // O dono edita livremente (preço > 0, estoque >= 0). Qualquer outro artesão
-      // só pode alterar o estoque, e nunca abaixo de zero (baixa feita na venda).
-      allow update: if logado()
+                    && request.resource.data.quantidadeEstoque is int
                     && request.resource.data.quantidadeEstoque >= 0
+                    && request.resource.data.criadoEm == request.time;
+
+      // The owner can edit product details without changing its identity.
+      // A different artisan can only decrease stock as part of the matching
+      // sale transaction.
+      allow update: if logado()
+                    && request.resource.data.artesaoId == resource.data.artesaoId
+                    && request.resource.data.qrCodeId == resource.data.qrCodeId
+                    && request.resource.data.nome is string
+                    && request.resource.data.nome.size() >= 2
+                    && request.resource.data.nome.size() <= 100
+                    && request.resource.data.descricao is string
+                    && request.resource.data.descricao.size() <= 500
+                    && request.resource.data.precoCentavos is int
                     && request.resource.data.precoCentavos > 0
-                    && (dono(resource.data.artesaoId)
-                        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantidadeEstoque']));
+                    && request.resource.data.quantidadeEstoque is int
+                    && request.resource.data.quantidadeEstoque >= 0
+                    && request.resource.data.ativo is bool
+                    && (
+                      (
+                        dono(resource.data.artesaoId)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['nome', 'descricao', 'precoCentavos',
+                                     'quantidadeEstoque', 'ativo',
+                                     'atualizadoEm', 'ultimaVendaId'])
+                      )
+                      ||
+                      (
+                        !dono(resource.data.artesaoId)
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['quantidadeEstoque', 'atualizadoEm', 'ultimaVendaId'])
+                        && request.resource.data.quantidadeEstoque < resource.data.quantidadeEstoque
+                        && request.resource.data.ultimaVendaId is string
+                        && existsAfter(/databases/$(database)/documents/vendas/$(request.resource.data.ultimaVendaId))
+                        && getAfter(/databases/$(database)/documents/vendas/$(request.resource.data.ultimaVendaId)).data.produtoId == id
+                        && getAfter(/databases/$(database)/documents/vendas/$(request.resource.data.ultimaVendaId)).data.vendedorId == request.auth.uid
+                        && getAfter(/databases/$(database)/documents/vendas/$(request.resource.data.ultimaVendaId)).data.quantidade ==
+                           resource.data.quantidadeEstoque - request.resource.data.quantidadeEstoque
+                      )
+                    );
+
       allow delete: if false;
     }
 
-    // Vendas: somente criação (irretratabilidade). Lê quem vendeu ou o dono do produto.
+    // Sales are append-only. Sale snapshots and stock decrements must match.
     match /vendas/{id} {
       allow read: if logado()
                   && (resource.data.vendedorId == request.auth.uid
                       || resource.data.artesaoId == request.auth.uid);
-      allow create: if dono(request.resource.data.vendedorId)
+
+      allow create: if logado()
+                    && request.resource.data.keys().hasOnly([
+                      'produtoId', 'produtoNome', 'artesaoId', 'artesaoNome',
+                      'vendedorId', 'vendedorNome', 'precoUnitarioCentavos',
+                      'quantidade', 'totalCentavos', 'dataHora'
+                    ])
+                    && request.resource.data.produtoId is string
+                    && request.resource.data.produtoNome is string
+                    && request.resource.data.artesaoId is string
+                    && request.resource.data.artesaoNome is string
+                    && request.resource.data.vendedorId == request.auth.uid
+                    && request.resource.data.vendedorNome is string
+                    && request.resource.data.quantidade is int
                     && request.resource.data.quantidade >= 1
+                    && request.resource.data.precoUnitarioCentavos is int
+                    && request.resource.data.precoUnitarioCentavos > 0
+                    && request.resource.data.totalCentavos is int
                     && request.resource.data.totalCentavos ==
-                       request.resource.data.precoUnitarioCentavos * request.resource.data.quantidade;
+                       request.resource.data.precoUnitarioCentavos * request.resource.data.quantidade
+                    && request.resource.data.dataHora == request.time
+                    && exists(produtoPath(request.resource.data.produtoId))
+                    && get(produtoPath(request.resource.data.produtoId)).data.ativo == true
+                    && get(produtoPath(request.resource.data.produtoId)).data.nome == request.resource.data.produtoNome
+                    && get(produtoPath(request.resource.data.produtoId)).data.artesaoId == request.resource.data.artesaoId
+                    && get(produtoPath(request.resource.data.produtoId)).data.artesaoNome == request.resource.data.artesaoNome
+                    && get(produtoPath(request.resource.data.produtoId)).data.precoCentavos == request.resource.data.precoUnitarioCentavos
+                    && getAfter(produtoPath(request.resource.data.produtoId)).data.quantidadeEstoque ==
+                       get(produtoPath(request.resource.data.produtoId)).data.quantidadeEstoque - request.resource.data.quantidade
+                    && getAfter(produtoPath(request.resource.data.produtoId)).data.ultimaVendaId == id;
+
       allow update, delete: if false;
     }
   }
