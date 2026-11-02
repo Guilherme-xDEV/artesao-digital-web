@@ -5,6 +5,9 @@ import { AppShell } from './components/AppShell'
 import Login from './pages/Login'
 import Cadastro from './pages/Cadastro'
 import Dashboard from './pages/Dashboard'
+import Produtos from './pages/Produtos'
+import CadastroProduto from './pages/CadastroProduto'
+import ProdutoQrCode from './pages/ProdutoQrCode'
 import EmBreve from './pages/EmBreve'
 
 export default function App() {
@@ -17,9 +20,10 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/produtos" element={<EmBreve titulo="Produtos" />} />
-              <Route path="/produtos/novo" element={<EmBreve titulo="Novo produto" />} />
-              <Route path="/produtos/:id/qrcode" element={<EmBreve titulo="QR Code do produto" />} />
+              <Route path="/produtos" element={<Produtos />} />
+              <Route path="/produtos/novo" element={<CadastroProduto />} />
+              <Route path="/produtos/:id/editar" element={<CadastroProduto />} />
+              <Route path="/produtos/:id/qrcode" element={<ProdutoQrCode />} />
               <Route path="/vendas/nova" element={<EmBreve titulo="Nova venda" />} />
               <Route path="/vendas/historico" element={<EmBreve titulo="Histórico de vendas" />} />
               <Route path="/perfil" element={<EmBreve titulo="Perfil" />} />

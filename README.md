@@ -20,7 +20,7 @@ Publique as regras com `firebase deploy --only firestore:rules`.
 
 - [x] 1. Fundação (tema Tauá, rotas, layout, Firebase)
 - [x] 2. Autenticação (login, cadastro, Google)
-- [ ] 3. Produtos e QR Code
+- [x] 3. Produtos e QR Code (CRUD, associação ao artesão, QR Code UUID, download e impressão)
 - [ ] 4. Venda com scanner e transação atômica
 - [ ] 5. Dashboard e histórico
 - [ ] 6. Testes das Security Rules, ajustes e deploy

@@ -13,20 +13,30 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Produtos: qualquer artesão autenticado lê (necessário para vender qualquer
-    // produto ativo); só o dono cria/edita; exclusão é lógica (campo "ativo").
+    // Produtos: leitura autenticada permite identificar itens durante uma venda.
+    // O ID do documento é o UUID codificado no QR Code.
     match /produtos/{id} {
       allow read: if logado();
+
       allow create: if dono(request.resource.data.artesaoId)
+                    && request.resource.data.qrCodeId == id
+                    && request.resource.data.ativo == true
                     && request.resource.data.precoCentavos > 0
                     && request.resource.data.quantidadeEstoque >= 0;
-      // O dono edita livremente (preço > 0, estoque >= 0). Qualquer outro artesão
-      // só pode alterar o estoque, e nunca abaixo de zero (baixa feita na venda).
+
+      // O proprietário pode editar os dados comerciais, mas não pode trocar
+      // o dono nem o identificador permanente do QR Code.
       allow update: if logado()
-                    && request.resource.data.quantidadeEstoque >= 0
+                    && request.resource.data.artesaoId == resource.data.artesaoId
+                    && request.resource.data.qrCodeId == resource.data.qrCodeId
                     && request.resource.data.precoCentavos > 0
-                    && (dono(resource.data.artesaoId)
-                        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantidadeEstoque']));
+                    && request.resource.data.quantidadeEstoque >= 0
+                    && (
+                      dono(resource.data.artesaoId)
+                      || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantidadeEstoque'])
+                    );
+
+      // A exclusão é lógica (ativo = false), preservando o histórico.
       allow delete: if false;
     }
 
