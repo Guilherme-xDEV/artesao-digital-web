@@ -11,7 +11,6 @@ import ProdutoQrCode from './pages/ProdutoQrCode'
 import RegistrarVenda from './pages/RegistrarVenda'
 import HistoricoVendas from './pages/HistoricoVendas'
 import Perfil from './pages/Perfil'
-import EmBreve from './pages/EmBreve'
 
 export default function App() {
   return (
