@@ -244,6 +244,60 @@ test('legacy numeric product ownership and decimal price can be migrated in plac
   assert.equal(migrated.id, legacyDocumentId)
 })
 
+test('legacy decimal prices can be sold with rounded integer cents', async () => {
+  const numericOwnerId = 924681
+  await seedProfile(ownerId, numericOwnerId)
+
+  const legacyDocumentId = 'legacy-decimal-product'
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'produtos', legacyDocumentId), {
+      id: 77124,
+      firestoreId: legacyDocumentId,
+      nome: 'Legacy woven basket',
+      descricao: 'Old Android price format',
+      preco: 10.99,
+      quantidadeEstoque: 4,
+      artesaoId: numericOwnerId,
+      qrCodeId: 'legacy-decimal-qr',
+      ativo: true,
+    })
+  })
+
+  const sellerDb = environment.authenticatedContext(sellerId).firestore()
+  const productRef = doc(sellerDb, 'produtos', legacyDocumentId)
+  const saleRef = doc(collection(sellerDb, 'vendas'))
+
+  await assertSucceeds(
+    runTransaction(sellerDb, async (transaction) => {
+      const productSnapshot = await transaction.get(productRef)
+      const product = productSnapshot.data()
+      const quantity = 1
+
+      transaction.update(productRef, {
+        quantidadeEstoque: product.quantidadeEstoque - quantity,
+        ultimaVendaId: saleRef.id,
+        atualizadoEm: serverTimestamp(),
+      })
+
+      transaction.set(saleRef, {
+        produtoId: legacyDocumentId,
+        produtoNome: product.nome,
+        artesaoId: numericOwnerId,
+        artesaoNome: 'Legacy Artisan',
+        vendedorId: sellerId,
+        vendedorNome: 'Seller Artisan',
+        precoUnitarioCentavos: 1099,
+        quantidade: quantity,
+        totalCentavos: 1099,
+        dataHora: serverTimestamp(),
+      })
+    }),
+  )
+
+  const updatedProduct = await getDoc(productRef)
+  assert.equal(updatedProduct.data().quantidadeEstoque, 3)
+})
+
 test('artisan can read legacy sales with its numeric profile ID', async () => {
   const numericOwnerId = 924681
   await seedProfile(ownerId, numericOwnerId)
