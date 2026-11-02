@@ -16,7 +16,7 @@ service cloud.firestore {
 
     // Artesãos: cada um lê e edita apenas o próprio perfil; nunca apaga.
     match /artesaos/{uid} {
-      allow read: if logado();
+      allow read: if dono(uid);
       allow create: if dono(uid);
       allow update: if dono(uid);
       allow delete: if false;

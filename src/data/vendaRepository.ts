@@ -1,10 +1,14 @@
 import {
   collection,
   doc,
+  getDocs,
+  query,
+  where,
   runTransaction,
   serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
+import type { Venda } from '../types/domain'
 
 export class VendaError extends Error {
   constructor(message: string) {
@@ -85,4 +89,18 @@ export async function registrarVenda(
   })
 
   return vendaRef.id
+}
+
+
+/** Loads sales made on products owned by the authenticated artisan. */
+export async function listarVendasDoArtesao(artesaoId: string): Promise<Venda[]> {
+  const salesQuery = query(
+    collection(db, 'vendas'),
+    where('artesaoId', '==', artesaoId),
+  )
+  const snapshot = await getDocs(salesQuery)
+
+  return snapshot.docs
+    .map((document) => ({ id: document.id, ...document.data() }) as Venda)
+    .sort((a, b) => b.dataHora.toMillis() - a.dataHora.toMillis())
 }
