@@ -27,6 +27,8 @@ const outsiderId = 'artisan-outsider'
 const productId = 'product-qr-uuid'
 
 const productFixture = {
+  id: legacyNumericId(productId),
+  firestoreId: productId,
   nome: 'Handmade clay vase',
   descricao: 'Red clay pottery',
   precoCentavos: 4500,
