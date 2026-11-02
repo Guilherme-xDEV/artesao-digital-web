@@ -174,9 +174,13 @@ test('a sale and stock decrement are allowed only in the same transaction', asyn
   const createdSale = await getDoc(saleRef)
   assert.equal(updatedProduct.data().quantidadeEstoque, 3)
   assert.equal(createdSale.data().totalCentavos, 9000)
+
+  // Sales are append-only, even for the artisan who registered the sale.
+  await assertFails(updateDoc(saleRef, { totalCentavos: 1 }))
+  await assertFails(deleteDoc(saleRef))
 })
 
-test('sales cannot be forged, edited or deleted', async () => {
+test('sales cannot be forged', async () => {
   await seedProduct()
 
   const sellerDb = environment.authenticatedContext(sellerId).firestore()

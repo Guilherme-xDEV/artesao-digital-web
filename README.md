@@ -29,7 +29,8 @@ firebase deploy --only firestore:rules
 - [x] 3. Products and QR codes (catalog, create/update/deactivate, UUID QR, download and print)
 - [x] 4. Sales (camera scanner, manual lookup, atomic sale and stock update)
 - [x] 5. Dashboard and history (sales metrics, 7/30-day charts, recent sales, best sellers)
-- [ ] 6. Firestore Security Rules tests, final adjustments and deployment
+- [x] 6. Firestore Security Rules tests and final adjustments
+- [ ] 7. Firebase Hosting and production Firestore deployment
 
 ## Firestore data model
 
@@ -43,6 +44,10 @@ Product removal is logical (`ativo: false`) so sales history is preserved.
 
 ## Important verification
 
-The application code and rules are committed, but the Firebase Emulator Suite tests and
-production deployment still need to be run against the target Firebase project. Do not
-consider the Security Rules or deployment phase complete until those checks pass.
+The Firebase Emulator Suite tests run in GitHub Actions and cover artisan profile privacy,
+product ownership, QR Code/document identity, stock protection, atomic sale registration,
+and append-only sales. The lint and production build checks also run in CI.
+
+Production Hosting deployment and Firestore rules publication have not been performed.
+They must be completed against the intended Firebase project after confirming its target
+configuration and deployment credentials.
