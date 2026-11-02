@@ -86,7 +86,15 @@ async function migrarIdentificadoresCanonicos(
   artesaoId: string,
 ): Promise<void> {
   const dados = documento.data()
-  const atualizacoes: Record<string, unknown> = {}
+  if (dados.artesaoId !== artesaoId) {
+    throw new Error('Não é possível migrar identificadores de um produto de outro artesão.')
+  }
+
+  const atualizacoes: {
+    id?: number
+    firestoreId?: string
+    atualizadoEm?: ReturnType<typeof serverTimestamp>
+  } = {}
 
   if (typeof dados.id !== 'number') {
     atualizacoes.id = idNumericoDoDocumento(documento.id)
@@ -94,18 +102,10 @@ async function migrarIdentificadoresCanonicos(
   if (dados.firestoreId !== documento.id) {
     atualizacoes.firestoreId = documento.id
   }
-  if (typeof dados.qrCodeId !== 'string') {
-    atualizacoes.qrCodeId = documento.id
-  }
 
   if (Object.keys(atualizacoes).length > 0) {
     atualizacoes.atualizadoEm = serverTimestamp()
     await updateDoc(documento.ref, atualizacoes)
-  }
-
-  // This guard makes the intended owner explicit if the query logic changes later.
-  if (dados.artesaoId !== artesaoId) {
-    throw new Error('Não é possível migrar identificadores de um produto de outro artesão.')
   }
 }
 
