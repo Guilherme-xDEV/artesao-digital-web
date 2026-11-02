@@ -46,8 +46,9 @@ Both the web and Android applications use the same Firebase project and collecti
 
 - `artesaos/{uid}`: artisan profile. The document ID and `uid` match Firebase Authentication.
   The numeric `id` remains as a compatibility key for older Android data.
-- `produtos/{documentId}`: `artesaoId` is the owner's Firebase Auth UID, `firestoreId`
-  stores the document ID, `qrCodeId` stores the QR payload, `precoCentavos` is an integer,
+- `produtos/{documentId}`: `id` is a deterministic numeric compatibility key,
+  `firestoreId` is the authoritative document ID, `artesaoId` is the owner's Firebase Auth
+  UID, `qrCodeId` stores the QR payload, `precoCentavos` is an integer,
   `quantidadeEstoque` is an integer, and `ativo` is boolean.
 - `vendas/{id}`: immutable sale snapshot with `produtoId`, artisan and seller identifiers,
   `precoUnitarioCentavos`, `quantidade`, `totalCentavos`, and server timestamp `dataHora`.
