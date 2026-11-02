@@ -57,6 +57,39 @@ service cloud.firestore {
         && data.ativo is bool;
     }
 
+    // Compatibility for the first deployed web bundle, which did not write
+    // the numeric id/firestoreId metadata yet.
+    function produtoWebLegadoValido(documentId) {
+      return request.resource.data.artesaoId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'nome', 'descricao', 'precoCentavos', 'quantidadeEstoque',
+          'artesaoId', 'artesaoNome', 'qrCodeId', 'ativo', 'criadoEm'
+        ])
+        && produtoValido(request.resource.data)
+        && request.resource.data.artesaoNome is string
+        && request.resource.data.qrCodeId == documentId
+        && request.resource.data.ativo == true
+        && request.resource.data.precoCentavos is int
+        && request.resource.data.criadoEm == request.time;
+    }
+
+    // Compatibility for Android builds that still write decimal reais and
+    // numeric artisan IDs. Ownership is checked against the signed-in profile.
+    function produtoAndroidLegadoValido(documentId) {
+      return request.resource.data.artesaoId is int
+        && donoPorIdentificador(request.resource.data.artesaoId)
+        && request.resource.data.keys().hasOnly([
+          'id', 'firestoreId', 'nome', 'descricao', 'preco',
+          'quantidadeEstoque', 'artesaoId', 'qrCodeId', 'ativo'
+        ])
+        && produtoValido(request.resource.data)
+        && request.resource.data.id is int
+        && request.resource.data.firestoreId == documentId
+        && request.resource.data.qrCodeId is string
+        && request.resource.data.ativo == true
+        && request.resource.data.preco is number;
+    }
+
     match /artesaos/{uid} {
       allow read: if logado() && request.auth.uid == uid;
 
@@ -85,23 +118,28 @@ service cloud.firestore {
     match /produtos/{id} {
       allow read: if logado();
 
-      // Canonical product writes use UID ownership and integer cents.
-      allow create: if logado()
-                    && request.resource.data.artesaoId == request.auth.uid
-                    && request.resource.data.keys().hasOnly([
-                      'id', 'firestoreId', 'nome', 'descricao',
-                      'precoCentavos', 'quantidadeEstoque',
-                      'artesaoId', 'artesaoNome', 'qrCodeId',
-                      'ativo', 'criadoEm'
-                    ])
-                    && produtoValido(request.resource.data)
-                    && request.resource.data.artesaoNome is string
-                    && request.resource.data.qrCodeId == id
-                    && request.resource.data.ativo == true
-                    && request.resource.data.precoCentavos is int
-                    && request.resource.data.criadoEm == request.time
-                    && request.resource.data.id is int
-                    && request.resource.data.firestoreId == id;
+      // Canonical writes plus narrow compatibility for already-deployed clients.
+      allow create: if logado() && (
+        (
+          request.resource.data.artesaoId == request.auth.uid
+          && request.resource.data.keys().hasOnly([
+            'id', 'firestoreId', 'nome', 'descricao',
+            'precoCentavos', 'quantidadeEstoque',
+            'artesaoId', 'artesaoNome', 'qrCodeId',
+            'ativo', 'criadoEm'
+          ])
+          && produtoValido(request.resource.data)
+          && request.resource.data.artesaoNome is string
+          && request.resource.data.qrCodeId == id
+          && request.resource.data.ativo == true
+          && request.resource.data.precoCentavos is int
+          && request.resource.data.criadoEm == request.time
+          && request.resource.data.id is int
+          && request.resource.data.firestoreId == id
+        )
+        || produtoWebLegadoValido(id)
+        || produtoAndroidLegadoValido(id)
+      );
 
       allow update: if logado()
                     && produtoValido(request.resource.data)
