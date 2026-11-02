@@ -206,6 +206,39 @@ test('a sale and stock decrement are allowed only in the same transaction', asyn
 })
 
 
+test('early web product documents can backfill compatibility identifiers', async () => {
+  await seedProfile(ownerId)
+
+  const earlyWebProductId = 'early-web-product-uuid'
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'produtos', earlyWebProductId), {
+      nome: 'Early web product',
+      descricao: 'Created before numeric compatibility metadata',
+      precoCentavos: 2599,
+      quantidadeEstoque: 3,
+      artesaoId: ownerId,
+      artesaoNome: 'Product Owner',
+      qrCodeId: earlyWebProductId,
+      ativo: true,
+    })
+  })
+
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
+  const productRef = doc(ownerDb, 'produtos', earlyWebProductId)
+  await assertSucceeds(
+    updateDoc(productRef, {
+      id: legacyNumericId(earlyWebProductId),
+      firestoreId: earlyWebProductId,
+      atualizadoEm: serverTimestamp(),
+    }),
+  )
+
+  const migrated = await getDoc(productRef)
+  assert.equal(migrated.data().firestoreId, earlyWebProductId)
+  assert.equal(migrated.data().id, legacyNumericId(earlyWebProductId))
+  assert.equal(migrated.data().qrCodeId, earlyWebProductId)
+})
+
 test('legacy numeric product ownership and decimal price can be migrated in place', async () => {
   const numericOwnerId = 924681
   await seedProfile(ownerId, numericOwnerId)
