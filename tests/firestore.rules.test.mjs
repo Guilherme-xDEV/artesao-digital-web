@@ -102,6 +102,12 @@ test('artisan profile can only be read and updated by its owner', async () => {
       nome: 'Unauthorized update',
     }),
   )
+
+  await assertFails(
+    updateDoc(doc(ownerDb, 'artesaos', ownerId), {
+      id: numericIdForTest,
+    }),
+  )
 })
 
 test('product creation requires ownership and matching QR document ID', async () => {
