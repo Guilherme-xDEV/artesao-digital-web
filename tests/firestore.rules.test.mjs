@@ -245,6 +245,37 @@ test('early web product documents can backfill compatibility identifiers', async
   assert.equal(migrated.data().qrCodeId, earlyWebProductId)
 })
 
+test('legacy product without artesaoNome can still be deactivated by its owner', async () => {
+  const numericOwnerId = 924681
+  await seedProfile(ownerId, numericOwnerId)
+
+  const legacyDocumentId = 'legacy-product-without-artisan-name'
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'produtos', legacyDocumentId), {
+      id: 77125,
+      firestoreId: legacyDocumentId,
+      nome: 'Legacy product',
+      descricao: 'Old Android product document',
+      preco: 15.75,
+      quantidadeEstoque: 2,
+      artesaoId: numericOwnerId,
+      qrCodeId: 'legacy-product-qr',
+      ativo: true,
+    })
+  })
+
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
+  await assertSucceeds(
+    updateDoc(doc(ownerDb, 'produtos', legacyDocumentId), {
+      ativo: false,
+      atualizadoEm: serverTimestamp(),
+    }),
+  )
+
+  const deactivated = await getDoc(doc(ownerDb, 'produtos', legacyDocumentId))
+  assert.equal(deactivated.data().ativo, false)
+})
+
 test('legacy numeric product ownership and decimal price can be migrated in place', async () => {
   const numericOwnerId = 924681
   await seedProfile(ownerId, numericOwnerId)
