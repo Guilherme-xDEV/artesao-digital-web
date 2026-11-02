@@ -61,7 +61,7 @@ async function seedProduct() {
 
 async function seedProfile(uid) {
   await environment.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(getFirestore(context), 'artesaos', uid), {
+    await setDoc(doc(context.firestore(), 'artesaos', uid), {
       nome: uid,
       telefone: '',
       email: `${uid}@example.test`,
@@ -80,7 +80,7 @@ test('artisan profile is readable only by its owner', async () => {
 })
 
 test('product creation requires ownership and matching QR document ID', async () => {
-  const ownerDb = getFirestore(environment.authenticatedContext(ownerId))
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
   const validProduct = {
     ...productFixture,
     criadoEm: serverTimestamp(),
@@ -98,7 +98,7 @@ test('product creation requires ownership and matching QR document ID', async ()
   )
 
   await assertFails(
-    setDoc(doc(getFirestore(environment.authenticatedContext(sellerId)), 'produtos', 'seller-product'), {
+    setDoc(doc(environment.authenticatedContext(sellerId).firestore(), 'produtos', 'seller-product'), {
       ...productFixture,
       artesaoId: ownerId,
       qrCodeId: 'seller-product',
@@ -110,8 +110,8 @@ test('product creation requires ownership and matching QR document ID', async ()
 test('only the product owner can edit or deactivate it; direct seller stock edits fail', async () => {
   await seedProduct()
 
-  const ownerDb = getFirestore(environment.authenticatedContext(ownerId))
-  const sellerDb = getFirestore(environment.authenticatedContext(sellerId))
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
+  const sellerDb = environment.authenticatedContext(sellerId).firestore()
 
   await assertSucceeds(
     updateDoc(doc(ownerDb, 'produtos', productId), {
@@ -139,7 +139,7 @@ test('only the product owner can edit or deactivate it; direct seller stock edit
 test('a sale and stock decrement are allowed only in the same transaction', async () => {
   await seedProduct()
 
-  const sellerDb = getFirestore(environment.authenticatedContext(sellerId))
+  const sellerDb = environment.authenticatedContext(sellerId).firestore()
   const productRef = doc(sellerDb, 'produtos', productId)
   const saleRef = doc(collection(sellerDb, 'vendas'))
 
@@ -179,7 +179,7 @@ test('a sale and stock decrement are allowed only in the same transaction', asyn
 test('sales cannot be forged, edited or deleted', async () => {
   await seedProduct()
 
-  const sellerDb = getFirestore(environment.authenticatedContext(sellerId))
+  const sellerDb = environment.authenticatedContext(sellerId).firestore()
   const saleRef = doc(collection(sellerDb, 'vendas'))
 
   await assertFails(
