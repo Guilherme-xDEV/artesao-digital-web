@@ -110,6 +110,40 @@ test('artisan profile can only be read and updated by its owner', async () => {
   )
 })
 
+test('first deployed web client can create and update a profile before identity backfill', async () => {
+  const ownerDb = environment.authenticatedContext(ownerId).firestore()
+  const profileRef = doc(ownerDb, 'artesaos', ownerId)
+
+  await assertSucceeds(
+    setDoc(profileRef, {
+      nome: 'Legacy web artisan',
+      telefone: '',
+      email: 'legacy@example.test',
+      criadoEm: serverTimestamp(),
+    }),
+  )
+
+  await assertSucceeds(
+    updateDoc(profileRef, {
+      nome: 'Updated by legacy web client',
+      telefone: '(88) 99999-9999',
+    }),
+  )
+
+  await assertSucceeds(
+    updateDoc(profileRef, {
+      id: legacyNumericId(ownerId),
+      uid: ownerId,
+    }),
+  )
+
+  await assertFails(
+    updateDoc(profileRef, {
+      id: legacyNumericId(ownerId) + 1,
+    }),
+  )
+})
+
 test('product creation requires ownership and matching QR document ID', async () => {
   const ownerDb = environment.authenticatedContext(ownerId).firestore()
   const validProduct = {
