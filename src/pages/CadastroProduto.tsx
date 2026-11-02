@@ -55,7 +55,7 @@ export default function CadastroProduto() {
     return () => {
       ativo = false
     }
-  }, [id, user, navigate])
+  }, [id, user, artesao?.id, navigate])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
