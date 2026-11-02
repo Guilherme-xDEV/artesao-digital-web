@@ -10,6 +10,7 @@ import {
   updateDoc,
   where,
   type DocumentData,
+  type DocumentSnapshot,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore'
 import { db } from '../lib/firebase'
@@ -72,7 +73,7 @@ async function obterIdLegadoDoArtesao(uid: string): Promise<number> {
 
 /** Convert a legacy Android product in place without changing its document ID or QR value. */
 async function migrarDocumentoLegado(
-  documento: QueryDocumentSnapshot<DocumentData>,
+  documento: DocumentSnapshot<DocumentData>,
   uid: string,
   artesaoNome: string,
 ): Promise<void> {
