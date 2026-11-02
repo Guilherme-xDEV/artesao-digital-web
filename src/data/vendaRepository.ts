@@ -131,7 +131,7 @@ export async function registrarVenda(
       produtoId,
       produtoNome: String(produto.nome),
       artesaoId: produto.artesaoId,
-      artesaoNome: String(produto.artesaoNome ?? ''),
+      artesaoNome: String(produto.artesaoNome || 'Artesão'),
       vendedorId,
       vendedorNome,
       precoUnitarioCentavos,
