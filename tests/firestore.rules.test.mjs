@@ -105,7 +105,7 @@ test('artisan profile can only be read and updated by its owner', async () => {
 
   await assertFails(
     updateDoc(doc(ownerDb, 'artesaos', ownerId), {
-      id: numericIdForTest,
+      id: legacyNumericId(ownerId) + 1,
     }),
   )
 })
