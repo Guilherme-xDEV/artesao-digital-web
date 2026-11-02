@@ -77,7 +77,7 @@ async function migrarDocumentoLegado(
   uid: string,
   artesaoNome: string,
 ): Promise<void> {
-  const dados = documento.data()
+  const dados = documento.data() ?? {}
   if (typeof dados.artesaoId !== 'number') return
 
   const precoCentavos = paraCentavos(dados)
