@@ -1,32 +1,26 @@
-# React + TypeScript + Vite
+# Artesão Digital — versão web
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Versão web do sistema de controle de estoque e vendas do Centro de Artesanato de Tauá.
 
-Currently, two official plugins are available:
+**Stack:** Vite + React + TypeScript, Tailwind CSS v4, Firebase (Auth, Firestore, Hosting),
+React Router, React Hook Form + Zod, html5-qrcode, qrcode.react, Recharts.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Rodando
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+cp .env.example .env   # preencha com as chaves do app web do Firebase
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+No console do Firebase: ative **Authentication** (E-mail/senha e Google) e crie o **Firestore**.
+Publique as regras com `firebase deploy --only firestore:rules`.
+
+## Fases
+
+- [x] 1. Fundação (tema Tauá, rotas, layout, Firebase)
+- [x] 2. Autenticação (login, cadastro, Google)
+- [ ] 3. Produtos e QR Code
+- [ ] 4. Venda com scanner e transação atômica
+- [ ] 5. Dashboard e histórico
+- [ ] 6. Testes das Security Rules, ajustes e deploy

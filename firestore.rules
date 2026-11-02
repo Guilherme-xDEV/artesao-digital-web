@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function logado() { return request.auth != null; }
+    function dono(uid) { return logado() && request.auth.uid == uid; }
+
+    // Artesãos: cada um lê e edita apenas o próprio perfil; nunca apaga.
+    match /artesaos/{uid} {
+      allow read: if logado();
+      allow create: if dono(uid);
+      allow update: if dono(uid);
+      allow delete: if false;
+    }
+
+    // Produtos: qualquer artesão autenticado lê (necessário para vender qualquer
+    // produto ativo); só o dono cria/edita; exclusão é lógica (campo "ativo").
+    match /produtos/{id} {
+      allow read: if logado();
+      allow create: if dono(request.resource.data.artesaoId)
+                    && request.resource.data.precoCentavos > 0
+                    && request.resource.data.quantidadeEstoque >= 0;
+      // O dono edita livremente (preço > 0, estoque >= 0). Qualquer outro artesão
+      // só pode alterar o estoque, e nunca abaixo de zero (baixa feita na venda).
+      allow update: if logado()
+                    && request.resource.data.quantidadeEstoque >= 0
+                    && request.resource.data.precoCentavos > 0
+                    && (dono(resource.data.artesaoId)
+                        || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['quantidadeEstoque']));
+      allow delete: if false;
+    }
+
+    // Vendas: somente criação (irretratabilidade). Lê quem vendeu ou o dono do produto.
+    match /vendas/{id} {
+      allow read: if logado()
+                  && (resource.data.vendedorId == request.auth.uid
+                      || resource.data.artesaoId == request.auth.uid);
+      allow create: if dono(request.resource.data.vendedorId)
+                    && request.resource.data.quantidade >= 1
+                    && request.resource.data.totalCentavos ==
+                       request.resource.data.precoUnitarioCentavos * request.resource.data.quantidade;
+      allow update, delete: if false;
+    }
+  }
+}
